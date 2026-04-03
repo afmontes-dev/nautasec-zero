@@ -58,3 +58,34 @@ NautaSec Zero is a handheld multi-protocol device capable of reading, capturing,
 - RFID-based asset identification and tracking
 - IR control of legacy industrial equipment
 - Physical-to-digita
+
+---
+
+## Status
+
+🔧 **In development** — hardware ordered, firmware in progress.
+
+| Module | Status |
+|---|---|
+| OLED menu | 🔄 In progress |
+| IR capture/emit | ⏳ Pending |
+| RFID 125kHz | ⏳ Pending |
+| NFC 13.56MHz | ⏳ Pending |
+| Sub-GHz CC1101 | ⏳ Pending |
+| WiFi web interface | ⏳ Pending |
+| n8n integration | ⏳ Pending |
+| Case design | ⏳ Pending |
+
+---
+
+## Legal Notice
+
+This device is intended strictly for authorized security auditing, educational purposes, and personal automation projects. Any use against systems without explicit written authorization is illegal. The author assumes no liability for misuse.
+
+---
+
+## Author
+
+**Andrés F. Montes**
+Mechanical Engineer — Process Automation & Industrial IoT
+[GitHub](https://github.com/afmontes-dev) · [LinkedIn](https://linkedin.com/in/tu-perfil)
