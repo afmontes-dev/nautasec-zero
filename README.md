@@ -88,4 +88,4 @@ This device is intended strictly for authorized security auditing, educational p
 
 **Andrés F. Montes**
 Mechanical Engineer — Process Automation & Industrial IoT
-[GitHub](https://github.com/afmontes-dev) · [LinkedIn](https://linkedin.com/in/tu-perfil)
+[GitHub](https://github.com/afmontes-dev) · [LinkedIn](www.linkedin.com/in/andres-felipe-montes-guerrero)
