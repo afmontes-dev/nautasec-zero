@@ -42,6 +42,10 @@ String lastRFIDCard = "";
 String lastNFCCard = "";
 String lastNFCType = "";
 
+// Sub-GHz storage
+String lastRFSignal = "";
+int lastRFFreq = 433;
+
 // ─── DISPLAY FUNCTIONS ────────────────────────────────────
 
 void drawMenu() {
@@ -163,6 +167,111 @@ void simulateNFCCard() {
   display.display();
   delay(2000);
   drawNFCMenu();
+}
+
+void drawSubGHzMenu() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Sub-GHz ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.println("UP:   Capture");
+  display.setCursor(0, 24);
+  display.println("DOWN: Replay");
+  display.setCursor(0, 34);
+  display.print("Freq: ");
+  display.print(lastRFFreq);
+  display.println(" MHz");
+  if (lastRFSignal != "") {
+    display.setCursor(0, 44);
+    display.print("Sig: ");
+    display.println(lastRFSignal);
+  } else {
+    display.setCursor(0, 44);
+    display.println("No signal captured");
+  }
+  display.setCursor(0, 54);
+  display.println("OK: Back");
+  display.display();
+}
+
+void simulateRFCapture() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Capturing RF ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.print("Freq: ");
+  display.print(lastRFFreq);
+  display.println(" MHz");
+  display.setCursor(0, 24);
+  display.println("Scanning...");
+  display.display();
+  delay(2000);
+
+  lastRFSignal = "A1B2C3D4";
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("== Captured! ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.print("Freq: ");
+  display.print(lastRFFreq);
+  display.println(" MHz");
+  display.setCursor(0, 24);
+  display.print("Signal: ");
+  display.println(lastRFSignal);
+  display.setCursor(0, 34);
+  display.println("Modulation: OOK");
+  display.setCursor(0, 44);
+  display.println("Saved.");
+  display.display();
+  delay(2000);
+  drawSubGHzMenu();
+}
+
+void simulateRFReplay() {
+  if (lastRFSignal == "") {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 20);
+    display.println("No signal to replay.");
+    display.println("Capture first.");
+    display.display();
+    delay(2000);
+    drawSubGHzMenu();
+    return;
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Replaying RF ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.print("Freq: ");
+  display.print(lastRFFreq);
+  display.println(" MHz");
+  display.setCursor(0, 24);
+  display.print("Signal: ");
+  display.println(lastRFSignal);
+  display.setCursor(0, 34);
+  display.println("Transmitting...");
+  display.display();
+  delay(2000);
+
+  display.setCursor(0, 44);
+  display.println("Done.");
+  display.display();
+  delay(1000);
+  drawSubGHzMenu();
 }
 
 // ─── IR FUNCTIONS ─────────────────────────────────────────
@@ -342,6 +451,7 @@ void loop() {
       if (currentModule == 2) drawRFIDMenu();
       if (currentModule == 3) drawIRMenu();
       if (currentModule == 1) drawNFCMenu();
+      if (currentModule == 0) drawSubGHzMenu();
 
       delay(200);
     }
@@ -389,6 +499,24 @@ void loop() {
       }
       if (digitalRead(BTN_DOWN) == LOW) {
         drawNFCMenu();
+        delay(200);
+      }
+      if (digitalRead(BTN_OK) == LOW) {
+        inSubmenu = false;
+        currentModule = -1;
+        drawMenu();
+        delay(200);
+      }
+    }
+
+    // ── Módulo Sub-GHz ──
+    if (currentModule == 0) {
+      if (digitalRead(BTN_UP) == LOW) {
+        simulateRFCapture();
+        delay(200);
+      }
+      if (digitalRead(BTN_DOWN) == LOW) {
+        simulateRFReplay();
         delay(200);
       }
       if (digitalRead(BTN_OK) == LOW) {
