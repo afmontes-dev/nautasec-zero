@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <IRremote.hpp>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -9,6 +10,9 @@
 #define BTN_UP    18
 #define BTN_DOWN  19
 #define BTN_OK    23
+
+#define IR_RECEIVE_PIN 15
+#define IR_SEND_PIN    4
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -21,6 +25,11 @@ const char* menuItems[] = {
 };
 const int menuSize = 5;
 int currentItem = 0;
+bool inSubmenu = false;
+
+// IR storage
+uint32_t lastIRCode = 0;
+uint16_t lastIRProtocol = 0;
 
 void drawMenu() {
   display.clearDisplay();
@@ -43,22 +52,99 @@ void drawMenu() {
   display.display();
 }
 
-void drawSelected() {
+void drawIRMenu() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
-  display.println("== NautaSec Zero ==");
+  display.println("== Infrared ==");
   display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-  display.setCursor(4, 25);
-  display.print("> ");
-  display.println(menuItems[currentItem]);
-  display.setCursor(4, 45);
-  display.println("OK to go back");
+  display.setCursor(0, 14);
+  display.println("UP:   Capture");
+  display.setCursor(0, 24);
+  display.println("DOWN: Replay");
+  display.setCursor(0, 34);
+
+  if (lastIRCode != 0) {
+    display.print("Code: 0x");
+    display.println(lastIRCode, HEX);
+  } else {
+    display.println("No code captured");
+  }
+
+  display.setCursor(0, 54);
+  display.println("OK: Back");
   display.display();
 }
 
-bool inSubmenu = false;
+void captureIR() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Capturing IR ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 20);
+  display.println("Point remote and");
+  display.setCursor(0, 30);
+  display.println("press any button...");
+  display.display();
+
+  IrReceiver.resume();
+  unsigned long start = millis();
+  while (millis() - start < 5000) {
+    if (IrReceiver.decode()) {
+      lastIRCode = IrReceiver.decodedIRData.decodedRawData;
+      lastIRProtocol = (uint16_t)IrReceiver.decodedIRData.protocol;
+      IrReceiver.resume();
+
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("== Captured! ==");
+      display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+      display.setCursor(0, 20);
+      display.print("Code: 0x");
+      display.println(lastIRCode, HEX);
+      display.setCursor(0, 35);
+      display.println("Saved.");
+      display.display();
+      delay(2000);
+      return;
+    }
+  }
+
+  display.clearDisplay();
+  display.setCursor(0, 20);
+  display.println("Timeout.");
+  display.println("No signal detected.");
+  display.display();
+  delay(1500);
+}
+
+void replayIR() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Replaying IR ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+  if (lastIRCode == 0) {
+    display.setCursor(0, 25);
+    display.println("No code to replay.");
+    display.println("Capture first.");
+    display.display();
+    delay(2000);
+    return;
+  }
+
+  IrSender.sendNEC(lastIRCode, 32);
+  display.setCursor(0, 20);
+  display.print("Sent: 0x");
+  display.println(lastIRCode, HEX);
+  display.display();
+  delay(1500);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -66,6 +152,9 @@ void setup() {
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
+
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+  IrSender.begin(IR_SEND_PIN);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("SSD1306 not found");
@@ -89,11 +178,23 @@ void loop() {
       delay(200);
     }
     if (digitalRead(BTN_OK) == LOW) {
-      inSubmenu = true;
-      drawSelected();
+      if (currentItem == 3) {
+        inSubmenu = true;
+        drawIRMenu();
+      }
       delay(200);
     }
   } else {
+    if (digitalRead(BTN_UP) == LOW) {
+      captureIR();
+      drawIRMenu();
+      delay(200);
+    }
+    if (digitalRead(BTN_DOWN) == LOW) {
+      replayIR();
+      drawIRMenu();
+      delay(200);
+    }
     if (digitalRead(BTN_OK) == LOW) {
       inSubmenu = false;
       drawMenu();
