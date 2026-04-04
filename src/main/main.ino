@@ -14,6 +14,9 @@
 #define IR_RECEIVE_PIN 15
 #define IR_SEND_PIN    4
 
+#define RDM6300_RX    16
+#define LED_RFID       2
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 const char* menuItems[] = {
@@ -26,10 +29,16 @@ const char* menuItems[] = {
 const int menuSize = 5;
 int currentItem = 0;
 bool inSubmenu = false;
+int currentModule = -1;
 
 // IR storage
 uint32_t lastIRCode = 0;
 uint16_t lastIRProtocol = 0;
+
+// RFID storage
+String lastRFIDCard = "";
+
+// ─── DISPLAY FUNCTIONS ────────────────────────────────────
 
 void drawMenu() {
   display.clearDisplay();
@@ -64,18 +73,41 @@ void drawIRMenu() {
   display.setCursor(0, 24);
   display.println("DOWN: Replay");
   display.setCursor(0, 34);
-
   if (lastIRCode != 0) {
     display.print("Code: 0x");
     display.println(lastIRCode, HEX);
   } else {
     display.println("No code captured");
   }
-
   display.setCursor(0, 54);
   display.println("OK: Back");
   display.display();
 }
+
+void drawRFIDMenu() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== RFID 125kHz ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.println("Scanning...");
+  display.setCursor(0, 24);
+  display.println("Place card near");
+  display.setCursor(0, 34);
+  display.println("reader.");
+  if (lastRFIDCard != "") {
+    display.setCursor(0, 44);
+    display.print("Last: ");
+    display.println(lastRFIDCard);
+  }
+  display.setCursor(0, 54);
+  display.println("OK: Back");
+  display.display();
+}
+
+// ─── IR FUNCTIONS ─────────────────────────────────────────
 
 void captureIR() {
   display.clearDisplay();
@@ -97,7 +129,6 @@ void captureIR() {
       lastIRCode = IrReceiver.decodedIRData.decodedRawData;
       lastIRProtocol = (uint16_t)IrReceiver.decodedIRData.protocol;
       IrReceiver.resume();
-
       display.clearDisplay();
       display.setCursor(0, 0);
       display.println("== Captured! ==");
@@ -112,7 +143,6 @@ void captureIR() {
       return;
     }
   }
-
   display.clearDisplay();
   display.setCursor(0, 20);
   display.println("Timeout.");
@@ -146,12 +176,81 @@ void replayIR() {
   delay(1500);
 }
 
+// ─── RFID FUNCTIONS ───────────────────────────────────────
+
+bool readRFID() {
+  if (Serial2.available() >= 14) {
+    byte buf[14];
+    Serial2.readBytes(buf, 14);
+
+    // Validar STX y ETX
+    if (buf[0] == 0x02 && buf[13] == 0x03) {
+      String cardID = "";
+      for (int i = 1; i <= 10; i++) {
+        cardID += (char)buf[i];
+      }
+      lastRFIDCard = cardID;
+
+      // Flash LED
+      digitalWrite(LED_RFID, HIGH);
+      delay(100);
+      digitalWrite(LED_RFID, LOW);
+
+      // Mostrar en pantalla
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(0, 0);
+      display.println("== Card Detected ==");
+      display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+      display.setCursor(0, 20);
+      display.print("ID: ");
+      display.println(cardID);
+      display.setCursor(0, 35);
+      display.println("Saved.");
+      display.display();
+      delay(2000);
+      drawRFIDMenu();
+      return true;
+    }
+  }
+  return false;
+}
+
+void simulateRFIDCard() {
+  lastRFIDCard = "0100 2A3B4C";
+
+  digitalWrite(LED_RFID, HIGH);
+  delay(100);
+  digitalWrite(LED_RFID, LOW);
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== Card Detected ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 20);
+  display.print("ID: ");
+  display.println(lastRFIDCard);
+  display.setCursor(0, 35);
+  display.println("Saved.");
+  display.display();
+  delay(2000);
+  drawRFIDMenu();
+}
+
+// ─── SETUP ────────────────────────────────────────────────
+
 void setup() {
   Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, RDM6300_RX, -1);
 
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
+  pinMode(LED_RFID, OUTPUT);
+  digitalWrite(LED_RFID, LOW);
 
   IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
   IrSender.begin(IR_SEND_PIN);
@@ -164,6 +263,8 @@ void setup() {
   display.clearDisplay();
   drawMenu();
 }
+
+// ─── LOOP ─────────────────────────────────────────────────
 
 void loop() {
   if (!inSubmenu) {
@@ -178,27 +279,46 @@ void loop() {
       delay(200);
     }
     if (digitalRead(BTN_OK) == LOW) {
-      if (currentItem == 3) {
-        inSubmenu = true;
-        drawIRMenu();
-      }
+      currentModule = currentItem;
+      inSubmenu = true;
+      if (currentModule == 2) drawRFIDMenu();
+      if (currentModule == 3) drawIRMenu();
       delay(200);
     }
   } else {
-    if (digitalRead(BTN_UP) == LOW) {
-      captureIR();
-      drawIRMenu();
-      delay(200);
+    // ── Módulo RFID ──
+    if (currentModule == 2) {
+      readRFID();
+      if (digitalRead(BTN_UP) == LOW) {
+        simulateRFIDCard();
+        delay(200);
+      }
+      if (digitalRead(BTN_OK) == LOW) {
+        inSubmenu = false;
+        currentModule = -1;
+        drawMenu();
+        delay(200);
+      }
     }
-    if (digitalRead(BTN_DOWN) == LOW) {
-      replayIR();
-      drawIRMenu();
-      delay(200);
-    }
-    if (digitalRead(BTN_OK) == LOW) {
-      inSubmenu = false;
-      drawMenu();
-      delay(200);
+
+    // ── Módulo IR ──
+    if (currentModule == 3) {
+      if (digitalRead(BTN_UP) == LOW) {
+        captureIR();
+        drawIRMenu();
+        delay(200);
+      }
+      if (digitalRead(BTN_DOWN) == LOW) {
+        replayIR();
+        drawIRMenu();
+        delay(200);
+      }
+      if (digitalRead(BTN_OK) == LOW) {
+        inSubmenu = false;
+        currentModule = -1;
+        drawMenu();
+        delay(200);
+      }
     }
   }
   delay(10);
