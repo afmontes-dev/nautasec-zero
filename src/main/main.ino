@@ -38,6 +38,10 @@ uint16_t lastIRProtocol = 0;
 // RFID storage
 String lastRFIDCard = "";
 
+// NFC storage
+String lastNFCCard = "";
+String lastNFCType = "";
+
 // ─── DISPLAY FUNCTIONS ────────────────────────────────────
 
 void drawMenu() {
@@ -105,6 +109,60 @@ void drawRFIDMenu() {
   display.setCursor(0, 54);
   display.println("OK: Back");
   display.display();
+}
+
+void drawNFCMenu() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== NFC 13.56MHz ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.println("UP: Scan card");
+  display.setCursor(0, 24);
+  display.println("DOWN: Show last");
+  if (lastNFCCard != "") {
+    display.setCursor(0, 34);
+    display.print("UID: ");
+    display.println(lastNFCCard);
+    display.setCursor(0, 44);
+    display.print("Type: ");
+    display.println(lastNFCType);
+  } else {
+    display.setCursor(0, 34);
+    display.println("No card scanned");
+  }
+  display.setCursor(0, 54);
+  display.println("OK: Back");
+  display.display();
+}
+
+void simulateNFCCard() {
+  lastNFCCard = "04 A3 2B 1C";
+  lastNFCType = "MIFARE Classic";
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("== NFC Detected ==");
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+  display.setCursor(0, 14);
+  display.print("UID: ");
+  display.println(lastNFCCard);
+  display.setCursor(0, 24);
+  display.print("Type: ");
+  display.println(lastNFCType);
+  display.setCursor(0, 34);
+  display.println("Sector 0 key:");
+  display.setCursor(0, 44);
+  display.println("FF FF FF FF FF FF");
+  display.setCursor(0, 54);
+  display.println("Saved.");
+  display.display();
+  delay(2000);
+  drawNFCMenu();
 }
 
 // ─── IR FUNCTIONS ─────────────────────────────────────────
@@ -283,6 +341,8 @@ void loop() {
       inSubmenu = true;
       if (currentModule == 2) drawRFIDMenu();
       if (currentModule == 3) drawIRMenu();
+      if (currentModule == 1) drawNFCMenu();
+
       delay(200);
     }
   } else {
@@ -311,6 +371,24 @@ void loop() {
       if (digitalRead(BTN_DOWN) == LOW) {
         replayIR();
         drawIRMenu();
+        delay(200);
+      }
+      if (digitalRead(BTN_OK) == LOW) {
+        inSubmenu = false;
+        currentModule = -1;
+        drawMenu();
+        delay(200);
+      }
+    }
+
+    // ── Módulo NFC ──
+    if (currentModule == 1) {
+      if (digitalRead(BTN_UP) == LOW) {
+        simulateNFCCard();
+        delay(200);
+      }
+      if (digitalRead(BTN_DOWN) == LOW) {
+        drawNFCMenu();
         delay(200);
       }
       if (digitalRead(BTN_OK) == LOW) {
