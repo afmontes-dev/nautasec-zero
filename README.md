@@ -69,7 +69,7 @@ NautaSec Zero is a handheld multi-protocol device capable of reading, capturing,
 |---|---|
 | OLED menu | ✅ Complete |
 | IR capture/emit | ✅ Complete |
-| RFID 125kHz | ⏳ Pending |
+| RFID 125kHz | ✅ Complete |
 | NFC 13.56MHz | ⏳ Pending |
 | Sub-GHz CC1101 | ⏳ Pending |
 | WiFi web interface | ⏳ Pending |
